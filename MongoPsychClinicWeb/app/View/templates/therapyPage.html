@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <h1 style="padding-inline-start: 15px;">Situation Analysis Therapy</h1>
+
+    {% if form %}
+        <div style="padding-inline-start: 20px;">
+            <p>Here is a summary of what happened, what you thought, felt, did, and were trying to have happen in the situation:</p>
+            
+            <div class="summary-section">
+                <strong>Situation:</strong>
+                <p>{{ situation_description }}</p>
+            </div>
+
+            <div class="summary-section">
+                <strong>Thoughts:</strong>
+                <p>{{ thought_description }}</p>
+                <ul>
+                    {% for thought in selected_negative_thoughts %}
+                        <li>{{ thought }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+
+            <div class="summary-section">
+                <strong>Feelings:</strong>
+                <ul>
+                    {% for feeling in selected_checked_feelings %}
+                        <li>{{ feeling }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+
+            <div class="summary-section">
+                <strong>Behaviors:</strong>
+                <p>{{ desired_outcome }}</p>
+            </div>
+
+            <div class="summary-section">
+                <strong>Desired Outcome:</strong>
+                <ul>
+                    {% for behavior in selected_checked_behaviors %}
+                        <li>{{ behavior }}</li>
+                    {% endfor %}
+                </ul>            </div>
+
+            <form action="{{url_for('routes.therapy', survey_id=survey_id, pos_neg=pos_neg, back=0)}}" method="post">
+                {{ form.hidden_tag() }}
+
+                <div class="form-section">
+                    <h2>Revised Desired Outcome?</h2>
+                    <p>Was what you were trying to do in this situation realistically attainable? Ideally, desired outcomes should not depend on something outside your control. They should depend on you only.</p>
+                    <p>For instance, you have control over your own reactions and responses but cannot control what someone else does or says.</p>
+                    
+                    <p>If your initial desired outcome was not phrased such that it is in your control, describe a revised desired outcome for this situation that is under your control, that involves just you, and that is realistic, attainable, and dependent on only your actions.</p>
+                    {{ form.revised_outcome(class="formbody", style="width:250px; height:100px", spellcheck="true") }}
+                </div>
+
+                <div class="form-section">
+                    <h2>Alternative Thoughts:</h2>
+                    <p>Is there another way of interpreting, or thinking about, this situation that would have increased your chances of getting your desired or revised desired outcome? If so, describe:</p>
+                    {{ form.alternative_thoughts(class="formbody", style="width:250px; height:100px", spellcheck="true") }}
+                </div>
+
+                <div class="form-section">
+                    <h2>Alternative Behaviors:</h2>
+                    <p>Is there another way of acting/behaving in this situation that would have increased your chances of getting your desired or revised desired outcome? If so, describe:</p>
+                    {{ form.alternative_behaviors(class="formbody", style="width:250px; height:100px", spellcheck="true") }}
+                </div>
+
+                <input type="submit" value="submit" class="button">
+            </form>
+
+            <form action="{{url_for('routes.behavior',survey_id=survey_id, pos_neg=pos_neg, back=1)}}" method="post">
+                <input type="submit" value="back" class="button">
+            </form>
+        </div>
+    {% endif %}
+{% endblock %}

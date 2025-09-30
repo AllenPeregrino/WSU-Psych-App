@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<style type="text/css"> 
+    .textBox {
+        width: 85%;
+        padding-inline-start: 20px;
+    }
+
+</style>   
+
+    <h1 style="padding-inline-start: 15px;"></h1>
+
+    {% if form %}
+        <form action="" method="post">
+            {{ form.hidden_tag() }}
+            <div class="textBox">
+                <p class="promptText">Think about the different situations/events you experienced today and select one in which you experienced positive or negative feelings.<br>For the situation you selected, did you experience mostly positive or negative feelings?</p>
+                
+                {{form.choice}}
+                {{ form.submit(class="button") }}
+            </div>
+        </form>
+    {% endif %}
+
+{% endblock %}
