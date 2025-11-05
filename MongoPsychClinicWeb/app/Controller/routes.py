@@ -384,71 +384,91 @@ def behavior(survey_id, pos_neg,back=0):
             intersectionCountB = 0
             intersectionCountTN = 0
             intersectionCountFN = 0
-           # loop through all surveys to find similar surveys
-            # only want similar surveys with signature ids
-            print("new change")
-            for survey in allSurveys:
-                #print("survey signature id", survey.signature)
-                    try:
-                        if not survey.signature or str(survey.id) == survey_id:
-                            continue
-                    except DoesNotExist:
-                        continue
-                    if str(survey.id) == survey_id:
-                        # collects data on survey in all of the surveys if positive situation collect data here
-                        if unique_survey.situation == 'Mostly positive feelings' :
-                            if survey.situation == 'Mostly positive feelings':
-                                if pos_neg == 'True':
-                                    print("IN TRUE")
+        # loop through all surveys to find similar surveys
+        # only want surveys that already have a signature, and not the current one
+        for survey in allSurveys:
+            try:
+                # skip surveys with no category or the current survey itself
+                if not survey.signature or str(survey.id) == str(survey_id):
+                    continue
+            except DoesNotExist:
+                continue
 
-                                    # adds the IDs the comparing
-                                    compareTP = survey.thoughts_pos
-                                    compareFP = survey.feelings_pos
-                                    compareB = survey.behaviors_mc
-                                    # calculates the intersection between the two
-                                    intersectionCountTP = intersection(compareTP, currentListTP)
-                                    intersectionCountFP = intersection(compareFP, currentListFP)
-                                    intersectionCountB = intersection(compareB, currentListB)
-                                    # print(intersectionCount/len(compareTP))
+            # POSITIVE FLOW: current survey is positive, comparing to other positive ones
+            if (
+                unique_survey.situation == "Mostly positive feelings"
+                and survey.situation == "Mostly positive feelings"
+                and pos_neg == "True"
+            ):
+                # lists from the *other* survey
+                compareTP = survey.thoughts_pos
+                compareFP = survey.feelings_pos
+                compareB  = survey.behaviors_mc
 
-                                    # check for similarity based on metrics of everything being atleast 50% in common
-                                    if (len(compareTP) !=0) and (len(compareFP) != 0) and (len(compareB) != 0):
-                                        if (intersectionCountTP/len(compareTP) >=0.50) and (intersectionCountFP/len(compareFP) >=0.50) and (intersectionCountB/len(compareB) >=0.50):
-                                            # creating list that will hold all similar survey ids
-                                            allSimilarSurveyID.append(survey.id)
-                                            # converts current similar survey id to a string
-                                            similarSurvey = str(survey.id)
-                                    elif ((len(compareTP) == 0 and len(currentListTP) == 0 )  or (len(compareFP) == 0 and len(currentListFP) == 0 )  or (len(compareB) == 0 and len(currentListB) == 0)):
-                                        allSimilarSurveyID.append(survey.id)
-                                        similarSurvey = str(survey.id)
-                                    compareTP = []
-                                    compareFP = []
-                                    compareB = []
-                        if unique_survey.situation == 'Mostly negative feelings':
-                            if survey.situation == 'Mostly negative feelings':
-                       #if survey that were searching through all surveys is negative collect data here
-                                if pos_neg == 'False':
-                                    print("IN FALSE")
-                                    # need to fill the compare lists that will be used against the survey entries
-                                    compareTN = survey.thoughts_neg
-                                    compareFN = survey.feelings_neg
-                                    compareB = survey.behaviors_mc
+                # compare to the current survey’s lists
+                intersectionCountTP = intersection(compareTP, currentListTP)
+                intersectionCountFP = intersection(compareFP, currentListFP)
+                intersectionCountB  = intersection(compareB,  currentListB)
 
-                                    intersectionCountTN = intersection(compareTN, currentListTN)
-                                    intersectionCountFN = intersection(compareFN, currentListFN)
-                                    intersectionCountB = intersection(compareB, currentListB)
+                # if all three lists are non-empty, require >= 50% overlap in each
+                if (
+                    len(compareTP) != 0
+                    and len(compareFP) != 0
+                    and len(compareB)  != 0
+                ):
+                    if (
+                        intersectionCountTP / len(compareTP) >= 0.50
+                        and intersectionCountFP / len(compareFP) >= 0.50
+                        and intersectionCountB  / len(compareB)  >= 0.50
+                    ):
+                        allSimilarSurveyID.append(survey.id)
+                        similarSurvey = str(survey.id)
 
-                                    # check for similarity based on metrics of everything being atleast 50% in common
-                                    if (len(compareTN) !=0) and (len(compareFN) != 0) and (len(compareB) != 0):
-                                        if (intersectionCountTN/len(compareTN) >=0.50) and (intersectionCountFN/len(compareFN) >=0.50) and (intersectionCountB/len(compareB) >=0.50):
-                                            allSimilarSurveyID.append(survey.id)
-                                            similarSurvey = str(survey.id)
-                                    elif ((len(compareTN) == 0 and len(currentListTN) == 0 )  or (len(compareFN) == 0 and len(currentListFN) == 0 )  or (len(compareB) == 0 and len(currentListB) == 0)):
-                                        allSimilarSurveyID.append(survey.id)
-                                        similarSurvey = str(survey.id)
-                                    compareTN = []
-                                    compareFN = []
-                                    compareB = []
+                # if any list is empty on *both* sides, treat them as compatible
+                elif (
+                    (len(compareTP) == 0 and len(currentListTP) == 0)
+                    or (len(compareFP) == 0 and len(currentListFP) == 0)
+                    or (len(compareB)  == 0 and len(currentListB)  == 0)
+                ):
+                    allSimilarSurveyID.append(survey.id)
+                    similarSurvey = str(survey.id)
+
+            # NEGATIVE FLOW: current survey is negative, comparing to other negative ones
+            elif (
+                unique_survey.situation == "Mostly negative feelings"
+                and survey.situation == "Mostly negative feelings"
+                and pos_neg == "False"
+            ):
+                compareTN = survey.thoughts_neg
+                compareFN = survey.feelings_neg
+                compareB  = survey.behaviors_mc
+
+                intersectionCountTN = intersection(compareTN, currentListTN)
+                intersectionCountFN = intersection(compareFN, currentListFN)
+                intersectionCountB  = intersection(compareB,  currentListB)
+
+                if (
+                    len(compareTN) != 0
+                    and len(compareFN) != 0
+                    and len(compareB)  != 0
+                ):
+                    if (
+                        intersectionCountTN / len(compareTN) >= 0.50
+                        and intersectionCountFN / len(compareFN) >= 0.50
+                        and intersectionCountB  / len(compareB)  >= 0.50
+                    ):
+                        allSimilarSurveyID.append(survey.id)
+                        similarSurvey = str(survey.id)
+
+                elif (
+                    (len(compareTN) == 0 and len(currentListTN) == 0)
+                    or (len(compareFN) == 0 and len(currentListFN) == 0)
+                    or (len(compareB)  == 0 and len(currentListB)  == 0)
+                ):
+                    allSimilarSurveyID.append(survey.id)
+                    similarSurvey = str(survey.id)
+            print("DEBUG similar IDs:", allSimilarSurveyID)
+            print("DEBUG similarSurvey:", similarSurvey)
             # if there are no similar surveys initialize similar survey string to -1
             if similarSurvey == "":
                 # changing int to a str to be the same as when similarSurvey is assigned to the object id
