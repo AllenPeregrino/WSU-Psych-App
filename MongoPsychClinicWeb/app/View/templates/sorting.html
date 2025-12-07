@@ -74,13 +74,12 @@
                     {% endfor %}
                 </ul>
 
-                {{form.newCategory.label}}<br>
-                {{form.newCategory}}
-                <br>
+                {{form2.newCategory.label}}<br>
+                {{form2.newCategory(class="formbody", style="width:250px; height:50px", spellcheck="true")}}
+                <br><br>
 
-                <br>
 
-                {{ form.submit(class="button") }}
+                {{ form2.submit(class="button") }}
                 {%endif%}
              </form>
 

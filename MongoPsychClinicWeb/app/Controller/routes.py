@@ -16,6 +16,7 @@ from sqlalchemy import desc
 from flask import session
 from flask import abort
 from mongoengine.errors import DoesNotExist
+from app.Service.ai_categorizer import suggest_category_and_matches
 
 bp_routes = Blueprint('routes', __name__)
 bp_routes.template_folder = Config.TEMPLATE_FOLDER #'..\\View\\templates'
@@ -325,177 +326,120 @@ def feelings(survey_id, pos_neg, back=0):
 
 @bp_routes.route('/behavior/<survey_id>/<pos_neg>/<back>', methods=['GET', 'POST'])
 @login_required
-def behavior(survey_id, pos_neg,back=0):
+def behavior(survey_id, pos_neg, back=0):
     print("pos_neg", pos_neg)
     behaviorForm = Behavior()
-    # unique survey is the current user survey the future new one
     unique_survey = Survey.objects(id=survey_id).first()
 
     behaviorForm.behaviors_mc.choices = [(str(t.id), t.name) for t in Behaviormc.objects]
 
     if back == '1':
-        print("testing")
-        unique_survey.behaviors_mc = []
-        unique_survey.behaviors_description = ""
-        unique_survey.behaviors_outcome = ""
+        # Clear behavior info when going back from later pages
+        if unique_survey:
+            unique_survey.behaviors_mc = []
+            unique_survey.behaviors_description = ""
+            unique_survey.behaviors_outcome = ""
+            unique_survey.save()
 
-        # return redirect(url_for('routes.feelings', survey_id = unique_survey.id, pos_neg=pos_neg, back=back))
     if behaviorForm.validate_on_submit():
         if unique_survey:
             if pos_neg == "False":
                 unique_survey.save_behaviors_negative(
-                    behaviors_mc = behaviorForm.behaviors_mc.data,
-                    behaviors_description = behaviorForm.descriptionNegative.data,
-                    behaviors_outcome = behaviorForm.outcome.data
+                    behaviors_mc=behaviorForm.behaviors_mc.data,
+                    behaviors_description=behaviorForm.descriptionNegative.data,
+                    behaviors_outcome=behaviorForm.outcome.data
                 )
             else:
                 unique_survey.save_behaviors_positive(
-                    behaviors_mc = behaviorForm.behaviors_mc.data,
-                    behaviors_description = behaviorForm.descriptionPositive.data
+                    behaviors_mc=behaviorForm.behaviors_mc.data,
+                    behaviors_description=behaviorForm.descriptionPositive.data
                 )
 
-            allSurveys = Survey.objects(user=current_user)
-            print("all surveys", allSurveys)
-            allSimilarSurveyID = []
-            similarSurvey = ""
+        # ---------- AI-based categorization (positive situations only) ----------
+        similarSurvey = "-1"
+        allSimilarSurveyID = []
+        convertSTR = "-1"
 
-            compareTP = []
-            compareFP = []
-            compareB = []
-            compareTN = []
-            compareFN = []
-            # print(type(unique_survey.thoughts_pos))
-            currentListTP = []
-            currentListFP = []
-            currentListB = []
-            currentListTN = []
-            currentListFN = []
+        if pos_neg == "True" and unique_survey:
+            user_sigs = Signature.objects(user=current_user.id)
+            prior_surveys = Survey.objects(user=current_user.id)
 
-            #gather all information of choose all that apply questions for current survey
-            currentListTP = unique_survey.thoughts_pos
-            currentListFP = unique_survey.feelings_pos
-            currentListB = unique_survey.behaviors_mc
-            currentListTN = unique_survey.thoughts_neg
-            currentListFN = unique_survey.feelings_neg
-
-            # print(currentList)
-            intersectionCountTP = 0
-            intersectionCountFP = 0
-            intersectionCountB = 0
-            intersectionCountTN = 0
-            intersectionCountFN = 0
-        # loop through all surveys to find similar surveys
-        # only want surveys that already have a signature, and not the current one
-        for survey in allSurveys:
             try:
-                # skip surveys with no category or the current survey itself
-                if not survey.signature or str(survey.id) == str(survey_id):
+                best_sig_id, other_sig_ids, ai_new_label = suggest_category_and_matches(
+                    unique_survey, user_sigs, prior_surveys
+                )
+            except Exception as e:
+                print(f"[AI ERROR] suggest_category_and_matches failed: {e}")
+                best_sig_id, other_sig_ids, ai_new_label = None, [], ""
+
+            # Save the AI label so Sorting page can prefill the textbox
+            session["ai_new_label"] = ai_new_label or ""
+            print("DEBUG behavior ai_new_label:", repr(ai_new_label))
+            # If AI chose an existing signature as “best match”
+            if best_sig_id:
+                best_sig = Signature.objects(id=best_sig_id, user=current_user.id).first()
+                if best_sig:
+                    best_survey = (
+                        Survey.objects(user=current_user.id, signature=best_sig)
+                        .order_by('-timestamp')
+                        .first()
+                    )
+                    if best_survey:
+                        similarSurvey = str(best_survey.id)
+                        allSimilarSurveyID.append(best_survey.id)
+
+            # Add any “other_similar_signature_ids” as additional options
+            for sid in other_sig_ids:
+                if sid == best_sig_id:
                     continue
-            except DoesNotExist:
-                continue
+                sig = Signature.objects(id=sid, user=current_user.id).first()
+                if not sig:
+                    continue
+                s = (
+                    Survey.objects(user=current_user.id, signature=sig)
+                    .order_by('-timestamp')
+                    .first()
+                )
+                if s:
+                    allSimilarSurveyID.append(s.id)
 
-            # POSITIVE FLOW: current survey is positive, comparing to other positive ones
-            if (
-                unique_survey.situation == "Mostly positive feelings"
-                and survey.situation == "Mostly positive feelings"
-                and pos_neg == "True"
-            ):
-                # lists from the *other* survey
-                compareTP = survey.thoughts_pos
-                compareFP = survey.feelings_pos
-                compareB  = survey.behaviors_mc
-
-                # compare to the current survey’s lists
-                intersectionCountTP = intersection(compareTP, currentListTP)
-                intersectionCountFP = intersection(compareFP, currentListFP)
-                intersectionCountB  = intersection(compareB,  currentListB)
-
-                # if all three lists are non-empty, require >= 50% overlap in each
-                if (
-                    len(compareTP) != 0
-                    and len(compareFP) != 0
-                    and len(compareB)  != 0
-                ):
-                    if (
-                        intersectionCountTP / len(compareTP) >= 0.50
-                        and intersectionCountFP / len(compareFP) >= 0.50
-                        and intersectionCountB  / len(compareB)  >= 0.50
-                    ):
-                        allSimilarSurveyID.append(survey.id)
-                        similarSurvey = str(survey.id)
-
-                # if any list is empty on *both* sides, treat them as compatible
-                elif (
-                    (len(compareTP) == 0 and len(currentListTP) == 0)
-                    or (len(compareFP) == 0 and len(currentListFP) == 0)
-                    or (len(compareB)  == 0 and len(currentListB)  == 0)
-                ):
-                    allSimilarSurveyID.append(survey.id)
-                    similarSurvey = str(survey.id)
-
-            # NEGATIVE FLOW: current survey is negative, comparing to other negative ones
-            elif (
-                unique_survey.situation == "Mostly negative feelings"
-                and survey.situation == "Mostly negative feelings"
-                and pos_neg == "False"
-            ):
-                compareTN = survey.thoughts_neg
-                compareFN = survey.feelings_neg
-                compareB  = survey.behaviors_mc
-
-                intersectionCountTN = intersection(compareTN, currentListTN)
-                intersectionCountFN = intersection(compareFN, currentListFN)
-                intersectionCountB  = intersection(compareB,  currentListB)
-
-                if (
-                    len(compareTN) != 0
-                    and len(compareFN) != 0
-                    and len(compareB)  != 0
-                ):
-                    if (
-                        intersectionCountTN / len(compareTN) >= 0.50
-                        and intersectionCountFN / len(compareFN) >= 0.50
-                        and intersectionCountB  / len(compareB)  >= 0.50
-                    ):
-                        allSimilarSurveyID.append(survey.id)
-                        similarSurvey = str(survey.id)
-
-                elif (
-                    (len(compareTN) == 0 and len(currentListTN) == 0)
-                    or (len(compareFN) == 0 and len(currentListFN) == 0)
-                    or (len(compareB)  == 0 and len(currentListB)  == 0)
-                ):
-                    allSimilarSurveyID.append(survey.id)
-                    similarSurvey = str(survey.id)
-            print("DEBUG similar IDs:", allSimilarSurveyID)
-            print("DEBUG similarSurvey:", similarSurvey)
-            # if there are no similar surveys initialize similar survey string to -1
-            if similarSurvey == "":
-                # changing int to a str to be the same as when similarSurvey is assigned to the object id
-                similarSurveyNum = "-1"
-                similarSurvey = str(similarSurveyNum)
-
-            # convert the similar survey list to a string to pass it into sorting route
             convertSTR = convertList(allSimilarSurveyID)
-            print("similar survey", similarSurvey)
 
-            # posted the new survey in the databse before assigning a signature
-        # only go to therapy page if it is a negative one
+        # ---------- Redirect ----------
         if pos_neg == "True":
-            return redirect(url_for('routes.sorting', survey_id = unique_survey.id, pos_neg=pos_neg, back='0', similarSurvey = similarSurvey, allSimilarList = convertSTR))
+            # Positive situations go to Sorting (with possible AI suggestions)
+            return redirect(url_for(
+                'routes.sorting',
+                survey_id=unique_survey.id,
+                pos_neg=pos_neg,
+                back='0',
+                similarSurvey=similarSurvey,
+                allSimilarList=convertSTR
+            ))
         else:
-            return redirect(url_for('routes.therapy', survey_id=unique_survey.id, pos_neg=pos_neg, back='0'))
+            # Negative situations still go to therapy page as before
+            return redirect(url_for(
+                'routes.therapy',
+                survey_id=unique_survey.id,
+                pos_neg=pos_neg,
+                back='0'
+            ))
 
-        #已修改
-        #return redirect(url_for('routes.sorting', survey_id = unique_survey.id, pos_neg=pos_neg, back='0', similarSurvey = similarSurvey, allSimilarList = convertSTR))
-        #return redirect(url_for('routes.therapy', survey_id=unique_survey.id, pos_neg=pos_neg, back='0'))
+    # Prefill behavior description on GET
+    if unique_survey:
+        if pos_neg == "False":
+            behaviorForm.descriptionNegative.data = unique_survey.behaviors_description
+        else:
+            behaviorForm.descriptionPositive.data = unique_survey.behaviors_description
 
-    if pos_neg == "False":
-        behaviorForm.descriptionNegative.data = unique_survey.behaviors_description
-    else:
-        behaviorForm.descriptionPositive.data = unique_survey.behaviors_description
+    return render_template('behavior.html',
+                           form=behaviorForm,
+                           pos_neg=pos_neg,
+                           back='0',
+                           survey_id=survey_id)
 
-    return render_template('behavior.html', form=behaviorForm, pos_neg=pos_neg, back='0', survey_id=survey_id)
+
+
 
 #已修改/添加
 @bp_routes.route('/therapy/<survey_id>/<pos_neg>/<back>', methods=['GET', 'POST'])
@@ -549,7 +493,7 @@ def therapy(survey_id, pos_neg, back):
 @bp_routes.route('/sorting/<survey_id>/<pos_neg>/<back>/<similarSurvey>/<allSimilarList>', methods=['GET', 'POST'])
 @login_required
 def sorting(survey_id, pos_neg, back, similarSurvey, allSimilarList):
-    test = Survey()
+    test = Survey() 
     unique_survey = Survey.objects.filter(id=survey_id).first()
     allUserSignatures = Signature.objects.filter(user = current_user.id).all()
 
@@ -575,6 +519,13 @@ def sorting(survey_id, pos_neg, back, similarSurvey, allSimilarList):
     total = []
     result = []
     print("similar survey num", similarSurvey)
+    ai_new_label = session.pop("ai_new_label", "")
+    print("DEBUG sorting ai_new_label:", repr(ai_new_label))
+
+    # Prefill the “new category” text box with AI’s suggestion, if we have one
+    if ai_new_label and not sortform2.newCategory.data:
+        sortform2.newCategory.data = ai_new_label
+
     # if there are similar surveys similar survey will NOT be equal to -1
     if similarSurvey != "-1":
         # test is a survey it gets the first similar survey to the current survey from the database returns Survey x
@@ -717,7 +668,7 @@ def sorting(survey_id, pos_neg, back, similarSurvey, allSimilarList):
 
             return redirect(url_for('routes.index'))
     return render_template('sorting.html', similarSurvey = similarSurvey, form=sortingForm, pos_neg=pos_neg, back='0', survey_id=survey_id, id =anotherthing.ifThen if anotherthing else '', situationlist = total,
-                           allSimilar = result, form2 =sortform2, allUserSignatures = sign)
+                           allSimilar = result, form2 =sortform2, allUserSignatures = sign,ai_new_label=ai_new_label)
 
 
 def intersection(survey, currentSurvey):
