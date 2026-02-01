@@ -4,16 +4,19 @@ import math
 graphs = {}
 
 def get_data(current, i):
+    global graphs
     df = pd.read_csv(current)
     recent = df.iloc[[i]]
     #recent = df.tail(1)
-    values = ['GoalThink', 'GoalSatis', 'GoalEfficacy', 'GoalIntrinsic', 'GoalApproach', 'GoalGrowth', 'GoalConflict', # Goal graphs
-              'StandardThink', 'StandardSatis', 'StandardEfficacy', 'Standardintrinsic', 'StandardApproach', 'StandardGrowth', 'StandardConflict',# Moral Standard Graphs
-              'RssmRelateSatis', 'RssmControlSatis', 'RssmEsteemFrus', 'RssmAutoFrus' , 'RSSMName1', 'RSSMName2', 'RSSMName3', 'RSSMName4'# RSSM graphs
-              ]
-    add_goals(recent, values[:7])
+    
+    
+    rssm_labels = [
+        'RssmRelateSatis', 'RssmControlSatis', 'RssmEsteemFrus', 'RssmAutoFrus',
+        'RSSMName1', 'RSSMName2', 'RSSMName3', 'RSSMName4'
+    ]
+    add_goals(recent)
     # add_morals(recent, values[7:])
-    add_rssm(recent, values[14:])
+    add_rssm(recent, rssm_labels)
     add_temperament(recent)
     add_descriptions(recent)
     add_comparison(recent)
@@ -47,133 +50,43 @@ def add_sensitivity(data):
 
 
 #goal questions have been changed but pruner has not been updated
-def add_goals(data, values):
+def add_goals(data):
+    global graphs
+    
+    # 11 goal dimensions and their REDCap-calculated columns
+    goal_dims = {
+        'Accessibility':   ['goal1_accessibility', 'goal2_accessibility', 'goal3_accessibility', 'goal4_accessibility'],
+        'PerceivedProgress': ['goal1_perceived_progress', 'goal2_perceived_progress', 'goal3_perceived_progress', 'goal4_perceived_progress'],
+        'SelfEfficacy':    ['goal1_self_efficacy', 'goal2_self_efficacy', 'goal3_self_efficacy', 'goal4_self_efficacy'],
+        'Approach':        ['goal1_approach', 'goal2_approach', 'goal3_approach', 'goal4_approach'],
+        'Avoidance':       ['goal1_avoidance', 'goal2_avoidance', 'goal3_avoidance', 'goal4_avoidance'],
+        'SelfConcordance': ['goal1_self_concordance', 'goal2_self_concordance', 'goal3_self_concordance', 'goal4_self_concordance'],
+        'Meaning':         ['goal1_meaning', 'goal2_meaning', 'goal3_meaning', 'goal4_meaning'],
+        'PsychNeedSatisfaction': ['goal1_psych_need_satisfaction', 'goal2_psych_need_satisfaction', 'goal3_psych_need_satisfaction', 'goal4_psych_need_satisfaction'],
+        'ControlSatisfaction':   ['goal1_control_satisfaction', 'goal2_control_satisfaction', 'goal3_control_satisfaction', 'goal4_control_satisfaction'],
+        'Relatedness':           ['goal1_relatedness', 'goal2_relatedness', 'goal3_relatedness', 'goal4_relatedness'],
+        'GoalConflict':          ['goal1_goal_conflict', 'goal2_goal_conflict', 'goal3_goal_conflict', 'goal4_goal_conflict']
+    }
+
     temp = {}
-    checker = 0
 
-    # Goal Think
-   # for x in range(4):
-    temp = {'GoalThink': [], 'GoalSatis': [], 'GoalEfficacy': [], 'GoalIntrinsic': [], 'GoalApproach': [], 'GoalGrowth': [], 'GoalConflict': []}
-    column_indices = [38, 49, 60, 71]
-    for column_index in column_indices:
-        column_name = f'Q{column_index}'
+    for dim, cols in goal_dims.items():
+        # Pull values for the 4 goals
+        values = []
+        for col in cols:
+            val = data.iloc[0].get(col, 0)  # fallback to 0 if column missing
+            if isinstance(val, float) and np.isnan(val):
+                val = None
+            values.append(val)
 
-        if checker == 1:
-        #temp[values[i]].append(data.iloc[0][f'{values[i]}{x+1}'])
-            temp['GoalThink'].append(data.iloc[0][column_name])
-        else:
-            temp['GoalThink'] = [data.iloc[0][column_name]]
-            checker = 1
+        # Compute mean of non-missing values
+        non_missing = [v for v in values if v is not None]
+        mean_val = sum(non_missing) / len(non_missing) if non_missing else 0
 
-    column_indices = ['43_1', '54_1', '66_1', '76_1']
-    for column_index in column_indices:
-        column_name = f'Q{column_index}'
-        if checker == 1:
-            #temp[values[i]].append(data.iloc[0][f'{values[i]}{x+1}'])
-            temp['GoalSatis'].append(data.iloc[0][column_name])
-        else:
-            temp['GoalSatis'] = [data.iloc[0][column_name]]
-            checker = 1
-
-    column_indices = ['42_1', '53_1', '64_1', '75_1']
-    for column_index in column_indices:
-        column_name = f'Q{column_index}'
-        if checker == 1:
-            #temp[values[i]].append(data.iloc[0][f'{values[i]}{x+1}'])
-            temp['GoalEfficacy'].append(data.iloc[0][column_name])
-        else:
-            temp['GoalEfficacy'] = [data.iloc[0][column_name]]
-            checker = 1
-
-    column_indices = ['41_1', '52_1', '63_1', '74_1']
-    for column_index in column_indices:
-        column_name = f'Q{column_index}'
-        if checker == 1:
-            #temp[values[i]].append(data.iloc[0][f'{values[i]}{x+1}'])
-            temp['GoalIntrinsic'].append(data.iloc[0][column_name])
-        else:
-            temp['GoalIntrinsic'] = [data.iloc[0][column_name]]
-            checker = 1
-
-    column_indices = ['39_1', '50_1', '61_1', '72_1']
-    for column_index in column_indices:
-        column_name = f'Q{column_index}'
-        if checker == 1:
-            #temp[values[i]].append(data.iloc[0][f'{values[i]}{x+1}'])
-            temp['GoalApproach'].append(data.iloc[0][column_name])
-        else:
-            temp['GoalApproach'] = [data.iloc[0][column_name]]
-            checker = 1
-
-    column_indices = ['40_1', '51_1', '62_1', '73_1']
-    for column_index in column_indices:
-        column_name = f'Q{column_index}'
-        if checker == 1:
-            #temp[values[i]].append(data.iloc[0][f'{values[i]}{x+1}'])
-            temp['GoalGrowth'].append(data.iloc[0][column_name])
-        else:
-            temp['GoalGrowth'] = [data.iloc[0][column_name]]
-            checker = 1
-
-    column_indices = ['40_1', '51_1', '62_1', '73_1']
-    for column_index in column_indices:
-        column_name = f'Q{column_index}'
-        if checker == 1:
-            #temp[values[i]].append(data.iloc[0][f'{values[i]}{x+1}'])
-            temp['GoalConflict'].append(data.iloc[0][column_name])
-        else:
-            temp['GoalConflict'] = [data.iloc[0][column_name]]
-            checker = 1
-
-
-    # handle if any values are nan
-    temp['GoalThink'] = [0 if isinstance(val, float) and np.isnan(val) else val for val in temp['GoalThink']]
-    temp['GoalSatis'] = [0 if isinstance(val, float) and np.isnan(val) else val for val in temp['GoalSatis']]
-    temp['GoalEfficacy'] = [0 if isinstance(val, float) and np.isnan(val) else val for val in temp['GoalEfficacy']]
-    temp['GoalIntrinsic'] = [0 if isinstance(val, float) and np.isnan(val) else val for val in temp['GoalIntrinsic']]
-    temp['GoalApproach'] = [0 if isinstance(val, float) and np.isnan(val) else val for val in temp['GoalApproach']]
-    temp['GoalGrowth'] = [0 if isinstance(val, float) and np.isnan(val) else val for val in temp['GoalGrowth']]
-    temp['GoalConflict'] = [0 if isinstance(val, float) and np.isnan(val) else val for val in temp['GoalConflict']]
-
-
-    # # Convert values to integers for calculation
-    values = [int(val) for val in temp['GoalThink']]
-    # Calculate the average
-    average = sum(values) / len(values)
-    temp['GoalThink'].insert(0, average)
-
-    values = [int(val) for val in temp['GoalSatis']]
-    # Calculate the average
-    average = sum(values) / len(values)
-    temp['GoalSatis'].insert(0, average)
-
-    values = [int(val) for val in temp['GoalEfficacy']]
-    # Calculate the average
-    average = sum(values) / len(values)
-    temp['GoalEfficacy'].insert(0, average)
-
-    values = [int(val) for val in temp['GoalIntrinsic']]
-    # Calculate the average
-    average = sum(values) / len(values)
-    temp['GoalIntrinsic'].insert(0, average)
-
-    values = [int(val) for val in temp['GoalApproach']]
-    # Calculate the average
-    average = sum(values) / len(values)
-    temp['GoalApproach'].insert(0, average)
-
-    values = [int(val) for val in temp['GoalGrowth']]
-    # Calculate the average
-    average = sum(values) / len(values)
-    temp['GoalGrowth'].insert(0, average)
-
-    values = [int(val) for val in temp['GoalConflict']]
-    # Calculate the average
-    average = sum(values) / len(values)
-    temp['GoalConflict'].insert(0, average)
+        # Store with mean at index 0, then goal values
+        temp[dim] = [mean_val] + [v if v is not None else 0 for v in values]
 
     graphs['Goals'] = temp
-    #print("goals graph: ", graphs['Goals'])
 
 # Note: Moral standards have been deleted
 def add_morals(data, values):
