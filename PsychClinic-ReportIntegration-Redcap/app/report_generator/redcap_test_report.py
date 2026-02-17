@@ -23,40 +23,30 @@ except ModuleNotFoundError as e:
 # Settings
 # -----------------------------
 save_survey_path = os.path.join(PROJECT_ROOT, "app", "report_generator")
-full_csv_path = os.path.join(save_survey_path, "redcap_data.csv")
-record_id_to_test = 2
+single_record_csv = os.path.join(save_survey_path, "redcap_data_2.csv")
 
-print(f"Full REDCap CSV path: {full_csv_path}")
+print(f"Using REDCap CSV: {single_record_csv}")
 
 # -----------------------------
-# Load CSV
+# Validate CSV exists
 # -----------------------------
-if not os.path.exists(full_csv_path):
-    print(f"CSV file not found at {full_csv_path}")
+if not os.path.exists(single_record_csv):
+    print(f"CSV file not found at {single_record_csv}")
     sys.exit(1)
 
-df = pd.read_csv(full_csv_path)
-print(f"CSV loaded. Total records: {len(df)}")
+# Optional sanity check (recommended)
+df = pd.read_csv(single_record_csv)
+print(f"CSV loaded. Rows: {len(df)}")
 
-# -----------------------------
-# Filter for specific record
-# -----------------------------
-record_df = df[df['record_id'] == record_id_to_test]
-
-if record_df.empty:
-    print(f"No data found for record_id {record_id_to_test}")
-    sys.exit(1)
-
-record_csv_path = os.path.join(save_survey_path, f"record_{record_id_to_test}.csv")
-record_df.to_csv(record_csv_path, index=False)
-print(f"Filtered CSV saved at: {record_csv_path}")
+if len(df) != 1:
+    print("⚠️ Warning: CSV contains more than one record")
 
 # -----------------------------
 # Generate report
 # -----------------------------
 try:
-    create_report(record_csv_path)
-    print(f"Test report successfully generated for record_id {record_id_to_test}")
+    create_report(single_record_csv)
+    print("Test report successfully generated from redcap_data_2.csv")
 except Exception as e:
     print(f"Error generating report: {e}")
     sys.exit(1)

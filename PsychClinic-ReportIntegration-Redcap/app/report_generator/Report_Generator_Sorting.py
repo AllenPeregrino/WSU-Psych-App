@@ -151,7 +151,7 @@ def create_report(csv_file_path):
         user_email = data['Personal']['Email']
         print(f"Extracted email: {user_email}")
         send_mail(user_email, 'Your personal assessment feedback report', 'Personalized_report.pdf')
-        send_mail('belindacses@gmail.com', 'Your personal assessment feedback report', 'Personalized_report.pdf')
+        #send_mail('belindacses@gmail.com', 'Your personal assessment feedback report', 'Personalized_report.pdf')
 
         print('----------------------------------------')
         print('Added sorting of results')
@@ -167,7 +167,7 @@ def create_report(csv_file_path):
             print('PDF Saved')
             pdfC.output('Personalized_report_C.pdf', 'F')
             print('----------------------------------------')
-            send_mail('belindacses@gmail.com', 'Clinician personal assessment feedback report', 'Personalized_report_C.pdf')
+            #send_mail('belindacses@gmail.com', 'Clinician personal assessment feedback report', 'Personalized_report_C.pdf')
 
         plt.close('all')
 
@@ -396,17 +396,17 @@ def goals_bar_graphs(my_path, pdf, data, descriptions, titles):
     }
 
     goal_dims = {
-        'Accessibility':   ['goal1_accessibility', 'goal2_accessibility', 'goal3_accessibility', 'goal4_accessibility'],
-        'PerceivedProgress': ['goal1_perceived_progress', 'goal2_perceived_progress', 'goal3_perceived_progress', 'goal4_perceived_progress'],
-        'SelfEfficacy':    ['goal1_self_efficacy', 'goal2_self_efficacy', 'goal3_self_efficacy', 'goal4_self_efficacy'],
-        'Approach':        ['goal1_approach', 'goal2_approach', 'goal3_approach', 'goal4_approach'],
-        'Avoidance':       ['goal1_avoidance', 'goal2_avoidance', 'goal3_avoidance', 'goal4_avoidance'],
-        'SelfConcordance': ['goal1_self_concordance', 'goal2_self_concordance', 'goal3_self_concordance', 'goal4_self_concordance'],
-        'Meaning':         ['goal1_meaning', 'goal2_meaning', 'goal3_meaning', 'goal4_meaning'],
-        'PsychNeedSatisfaction': ['goal1_psych_need_satisfaction', 'goal2_psych_need_satisfaction', 'goal3_psych_need_satisfaction', 'goal4_psych_need_satisfaction'],
-        'ControlSatisfaction':   ['goal1_control_satisfaction', 'goal2_control_satisfaction', 'goal3_control_satisfaction', 'goal4_control_satisfaction'],
-        'Relatedness':           ['goal1_relatedness', 'goal2_relatedness', 'goal3_relatedness', 'goal4_relatedness'],
-        'GoalConflict':          ['goal1_goal_conflict', 'goal2_goal_conflict', 'goal3_goal_conflict', 'goal4_goal_conflict']
+        'Accessibility':   ['Goal 1', 'Goal 2', 'Goal 3', 'Goal 4'],
+        'PerceivedProgress': ['Goal 1', 'Goal 2', 'Goal 3', 'Goal 4'],
+        'SelfEfficacy':    ['Goal 1', 'Goal 2', 'Goal 3', 'Goal 4'],
+        'Approach':        ['Goal 1', 'Goal 2', 'Goal 3', 'Goal 4'],
+        'Avoidance':      ['Goal 1', 'Goal 2', 'Goal 3', 'Goal 4'],
+        'SelfConcordance': ['Goal 1', 'Goal 2', 'Goal 3', 'Goal 4'],
+        'Meaning':         ['Goal 1', 'Goal 2', 'Goal 3', 'Goal 4'],
+        'PsychNeedSatisfaction': ['Goal 1', 'Goal 2', 'Goal 3', 'Goal 4'],
+        'ControlSatisfaction':   ['Goal 1', 'Goal 2', 'Goal 3', 'Goal 4'],
+        'Relatedness':           ['Goal 1', 'Goal 2', 'Goal 3', 'Goal 4'],
+        'GoalConflict':         ['Goal 1', 'Goal 2', 'Goal 3', 'Goal 4'],
     }
 
     # Loop through all goal dimensions
@@ -435,7 +435,8 @@ def goals_bar_graphs(my_path, pdf, data, descriptions, titles):
         PDF_Generator.print_textboxes(pdf, "Goal", descriptions, 4)
 
         # 创建图表
-        Graph_Generator.create_bargraph(pdf, my_path, 8, value, labels, key, titles.pop(0), descriptions)
+        current_title = title_map.get(key, "Goal")
+        Graph_Generator.create_bargraph(pdf, my_path, 8, value, labels, key, current_title, descriptions)
         pdf.ln(5)  # Adjust this value as needed
 
         # 生成反馈并在反馈框中显示
@@ -443,8 +444,8 @@ def goals_bar_graphs(my_path, pdf, data, descriptions, titles):
         PDF_Generator.print_feedback_box_horizontal(pdf, feedback, x=10, y=None, w=180,offset_y=30)
 
         # 添加图表图像
-        image_path = os.path.join(my_path, f"{holder}_Scaling.png")
-        pdf.image(image_path, 95, 94, (WIDTH / 2) + 10)
+        #image_path = os.path.join(my_path, f"{holder}_Scaling.png")
+        #pdf.image(image_path, 95, 94, (WIDTH / 2) + 10)
 
 # Create and add the text boxes and graphs for the standard graphs
 def standard_bar_graphs(my_path, pdf, data, descriptions, titles):

@@ -156,7 +156,7 @@ def create_csip_bargraph(pdf, path, height, data, names, key, title):
     ax.set_xticklabels(['0', '1', '2', '3', '4', '5'])  # 设置刻度标签
     plt.gcf().subplots_adjust(left=0.25)
 
-    # Adding red text for missing bars
+    # Adding red text for missing belindacses@gmail.combars
     for i, (score, label) in enumerate(zip(adjusted_scores[::-1], bar_labels[::-1])):  # Reverse to align with plot
         if score == -1:  # Identify placeholder values as missing data
             plt.text(0.2, i, "(Missing)", color="red", va='center', ha='left', fontsize=10)

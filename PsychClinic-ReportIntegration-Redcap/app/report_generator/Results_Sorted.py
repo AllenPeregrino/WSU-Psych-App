@@ -18,8 +18,8 @@ def get_sort(data):
     all = []
     temperament = [data['Temperament']['BIS'], data['Temperament']['BAS-RR'], data['Temperament']['BAS-D'], data['Temperament']['BAS-FS']]
     tFactors = ["BIS", "BAS: Reward Responsiveness", "BAS: Drive", "BAS: Fun Seeking"]
-    selfRegulation = [data['Goals']['GoalThink'], data['Goals']['GoalSatis'], data['Goals']['GoalEfficacy'], data['Goals']['GoalIntrinsic'], data['Goals']['GoalApproach'], data['Goals']['GoalGrowth'], data['Goals']['GoalConflict']]
-    srFactors = ["Goal Thinking", "Goal Satisfaction", "Goal Self-Efficacy", "Goal Intrinsic Motivation", "Goal Approach Orientation", "Goal Growth Mindset", "Goal Level of Conflict"]
+    selfRegulation = [data['Goals']['Accessibility'],data['Goals']['PerceivedProgress'],data['Goals']['SelfEfficacy'],data['Goals']['Approach'],data['Goals']['SelfConcordance'],data['Goals']['Meaning'],data['Goals']['PsychNeedSatisfaction'],data['Goals']['ControlSatisfaction'],data['Goals']['Relatedness'],data['Goals']['GoalConflict']]
+    srFactors = ["Goal Accessibility","Goal Perceived Progress","Goal Self-Efficacy","Goal Approach Orientation","Goal Self-Concordance","Goal Meaning","Goal Psychological Need Satisfaction","Goal Control Satisfaction","Goal Relatedness", "Goal Level of Conflict"]
     beliefsRSSM = [data['RSSM']['RssmRelateSatis'], data['RSSM']['RssmControlSatis'], data['RSSM']['RssmEsteemFrus'], data['RSSM']['RssmAutoFrus']]
     #print("Expected value (1.5625) directly from beliefsRSSM:", beliefsRSSM[2][0])
     rssmFactors = ["Relatedness Satisfaction", "Control Satisfaction", "Self-Esteem Frustration", "Autonomy Frustration"]

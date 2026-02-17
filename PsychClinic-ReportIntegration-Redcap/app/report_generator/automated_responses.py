@@ -43,5 +43,5 @@ def get_redcap_survey(save_path, record_id=None):
 
 if __name__ == "__main__":
     # Example usage: download a single record
-    csv_file = get_redcap_survey(save_path=".", record_id="123")
+    csv_file = get_redcap_survey(save_path=".", record_id=2)
     print(f"Saved REDCap CSV at: {csv_file}")
