@@ -4,7 +4,7 @@ from flask_login import UserMixin
 from datetime import datetime
 from app import db
 from app import login
-from mongoengine import Document, StringField, EmailField, IntField, ReferenceField, ListField, DateTimeField
+from mongoengine import Document, StringField, EmailField, IntField, ReferenceField, ListField, DateTimeField, BooleanField
 
 @login.user_loader
 def load_user(id):
@@ -149,3 +149,17 @@ class Signature(Document):
     user = ReferenceField('User')
     survey = ReferenceField('Survey', reverse_delete_rule=mongoengine.NULLIFY)
     situationList = ListField(ReferenceField('SituationList', reverse_delete_rule=mongoengine.CASCADE))
+
+class AICategoryFeedback(Document):
+    user = ReferenceField('User', required=True)
+    survey = ReferenceField('Survey', required=True)
+
+    suggested_sig_id = StringField()   # store as string to avoid ObjectId import hassles
+    suggested_label = StringField()
+
+    chosen_sig_id = StringField()
+    chosen_label = StringField()
+
+    was_accepted = BooleanField(required=True)
+    model_version = StringField()
+    created_at = DateTimeField(default=datetime.utcnow)

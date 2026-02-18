@@ -8,7 +8,7 @@ from config import Config
 from flask_login import  current_user, login_required
 from app import db
 from app.Model.models import User, Survey, SituationList, Signature, Thoughtspositive, Thoughtsnegative, \
-    Feelingspositive, Feelingsnegative, Behaviormc
+    Feelingspositive, Feelingsnegative, Behaviormc, AICategoryFeedback
 from app.Controller.forms import SituationForm, WhatHappened, Thoughts, Feelings, Behavior, SortingForm2, AdminQsortForm,TherapyForm,SortingForm
 from datetime import datetime
 from sqlalchemy.sql import func
@@ -17,6 +17,7 @@ from flask import session
 from flask import abort
 from mongoengine.errors import DoesNotExist
 from app.Service.ai_categorizer import suggest_category_and_matches
+
 
 bp_routes = Blueprint('routes', __name__)
 bp_routes.template_folder = Config.TEMPLATE_FOLDER #'..\\View\\templates'
@@ -323,13 +324,21 @@ def feelings(survey_id, pos_neg, back=0):
 
     return render_template('feelings.html', form=feelingsForm, pos_neg=pos_neg, back='0', survey_id=survey_id)
 
-
 @bp_routes.route('/behavior/<survey_id>/<pos_neg>/<back>', methods=['GET', 'POST'])
 @login_required
 def behavior(survey_id, pos_neg, back=0):
     print("pos_neg", pos_neg)
     behaviorForm = Behavior()
     unique_survey = Survey.objects(id=survey_id).first()
+
+    best_sig_id = None
+    other_sig_ids = []
+    ai_new_label = ""
+    best_label_text = ""
+    similarSurvey = "-1"
+    allSimilarSurveyID = []
+    convertSTR = "-1"
+
 
     behaviorForm.behaviors_mc.choices = [(str(t.id), t.name) for t in Behaviormc.objects]
 
@@ -355,32 +364,50 @@ def behavior(survey_id, pos_neg, back=0):
                     behaviors_description=behaviorForm.descriptionPositive.data
                 )
 
-        # ---------- AI-based categorization (positive situations only) ----------
+        # AI-based categorization (positive situations only)
         similarSurvey = "-1"
         allSimilarSurveyID = []
         convertSTR = "-1"
 
         if pos_neg == "True" and unique_survey:
-            user_sigs = Signature.objects(user=current_user.id)
-            prior_surveys = Survey.objects(user=current_user.id)
+            user_sigs = Signature.objects(user=current_user)
+            prior_surveys = Survey.objects(user=current_user)
+
 
             try:
-                best_sig_id, other_sig_ids, ai_new_label = suggest_category_and_matches(
+                best_sig_id, other_sig_ids, ai_new_label, best_label_text = suggest_category_and_matches(
                     unique_survey, user_sigs, prior_surveys
                 )
             except Exception as e:
                 print(f"[AI ERROR] suggest_category_and_matches failed: {e}")
-                best_sig_id, other_sig_ids, ai_new_label = None, [], ""
+                best_sig_id, other_sig_ids, ai_new_label, best_label_text = None, [], "", ""
+
+            print("DEBUG user_sigs count:", user_sigs.count())
+            print("DEBUG prior_surveys count:", prior_surveys.count())
+            print("DEBUG best_sig_id:", best_sig_id)
+            print("DEBUG similarSurvey:", similarSurvey)
+            print("DEBUG allSimilarSurveyID:", allSimilarSurveyID)
 
             # Save the AI label so Sorting page can prefill the textbox
             session["ai_new_label"] = ai_new_label or ""
+
+
+            # NEW: store full AI recommendation context so we can record feedback later
+            session["ai_suggestion"] = {
+                "best_sig_id": str(best_sig_id) if best_sig_id else None,
+                "best_label": best_label_text or "",
+                "other_sig_ids": [str(x) for x in (other_sig_ids or [])],
+                "ai_new_label": ai_new_label or "",
+                "created_at": datetime.utcnow().isoformat(),
+                "model_version": "ai_categorizer_v1"  # optional string you can bump later
+            }
             print("DEBUG behavior ai_new_label:", repr(ai_new_label))
             # If AI chose an existing signature as “best match”
             if best_sig_id:
-                best_sig = Signature.objects(id=best_sig_id, user=current_user.id).first()
+                best_sig = Signature.objects(id=best_sig_id, user=current_user).first()
                 if best_sig:
                     best_survey = (
-                        Survey.objects(user=current_user.id, signature=best_sig)
+                        Survey.objects(user=current_user, signature=best_sig)
                         .order_by('-timestamp')
                         .first()
                     )
@@ -388,18 +415,20 @@ def behavior(survey_id, pos_neg, back=0):
                         similarSurvey = str(best_survey.id)
                         allSimilarSurveyID.append(best_survey.id)
 
-            # Add any “other_similar_signature_ids” as additional options
             for sid in other_sig_ids:
                 if sid == best_sig_id:
                     continue
-                sig = Signature.objects(id=sid, user=current_user.id).first()
+                sig = Signature.objects(id=sid, user=current_user).first()
                 if not sig:
                     continue
                 s = (
-                    Survey.objects(user=current_user.id, signature=sig)
+                    Survey.objects(user=current_user, signature=sig)
                     .order_by('-timestamp')
                     .first()
                 )
+                if s:
+                    allSimilarSurveyID.append(s.id)
+
                 if s:
                     allSimilarSurveyID.append(s.id)
 
@@ -437,9 +466,6 @@ def behavior(survey_id, pos_neg, back=0):
                            pos_neg=pos_neg,
                            back='0',
                            survey_id=survey_id)
-
-
-
 
 #已修改/添加
 @bp_routes.route('/therapy/<survey_id>/<pos_neg>/<back>', methods=['GET', 'POST'])
@@ -495,7 +521,7 @@ def therapy(survey_id, pos_neg, back):
 def sorting(survey_id, pos_neg, back, similarSurvey, allSimilarList):
     test = Survey() 
     unique_survey = Survey.objects.filter(id=survey_id).first()
-    allUserSignatures = Signature.objects.filter(user = current_user.id).all()
+    allUserSignatures = Signature.objects(user=current_user)
 
     sign = []
     for s in allUserSignatures:
@@ -596,6 +622,7 @@ def sorting(survey_id, pos_neg, back, similarSurvey, allSimilarList):
                     # set the signature to the current survey and add the situation to the situation list table
                     unique_survey.signature = anotherthing
                     unique_survey.save()
+                    _log_ai_feedback(unique_survey, anotherthing, anotherthing.ifThen)
                     newSituation = SituationList(signature = anotherthing, situation = unique_survey.what_happened)
                     newSituation.save()
 
@@ -613,6 +640,7 @@ def sorting(survey_id, pos_neg, back, similarSurvey, allSimilarList):
                     print(getIfThen)
                     unique_survey.signature = getIfThen
                     unique_survey.save()
+                    _log_ai_feedback(unique_survey, getIfThen, getIfThen.ifThen)
                     newSituation = SituationList(signature = getIfThen, situation = unique_survey.what_happened)
                     newSituation.save()
                 # flash message if user chose more than one similar survey
@@ -624,16 +652,18 @@ def sorting(survey_id, pos_neg, back, similarSurvey, allSimilarList):
                     getIfThen = Signature.objects(ifThen = option[0]).first()
                     unique_survey.signature = getIfThen
                     unique_survey.save()
+                    _log_ai_feedback(unique_survey, getIfThen, getIfThen.ifThen)
                     newSituation = SituationList(signature = getIfThen, situation = unique_survey.what_happened)
                     newSituation.save()
                 # user entered in a new category
                 else:
                     input = sortingForm.newCategory.data
-                    newIfthen = Signature(ifThen = input, user = current_user.id)
+                    newIfthen = Signature(ifThen = input, user = current_user)
                     newIfthen.survey = unique_survey
                     newIfthen.save()
                     unique_survey.signature = newIfthen
                     unique_survey.save()
+                    _log_ai_feedback(unique_survey, newIfthen, newIfthen.ifThen)
                     newSituation = SituationList(signature = newIfthen, situation = unique_survey.what_happened)
                     newSituation.save()
 
@@ -650,6 +680,7 @@ def sorting(survey_id, pos_neg, back, similarSurvey, allSimilarList):
                 getIfThen = Signature.objects(ifThen = option2[0]).first()
                 unique_survey.signature = getIfThen
                 unique_survey.save()
+                _log_ai_feedback(unique_survey, getIfThen, getIfThen.ifThen)
                 newSituation = SituationList(signature = getIfThen, situation = unique_survey.what_happened)
                 newSituation.save()
             elif len(option2) == 0:
@@ -663,6 +694,7 @@ def sorting(survey_id, pos_neg, back, similarSurvey, allSimilarList):
                 unique_survey = Survey.objects.get(id=survey_id)
                 unique_survey.signature = newIfthen
                 unique_survey.save()
+                _log_ai_feedback(unique_survey, newIfthen, newIfthen.ifThen)
                 new_situation = SituationList(signature=newIfthen, situation=unique_survey.what_happened)
                 new_situation.save()
 
@@ -670,6 +702,47 @@ def sorting(survey_id, pos_neg, back, similarSurvey, allSimilarList):
     return render_template('sorting.html', similarSurvey = similarSurvey, form=sortingForm, pos_neg=pos_neg, back='0', survey_id=survey_id, id =anotherthing.ifThen if anotherthing else '', situationlist = total,
                            allSimilar = result, form2 =sortform2, allUserSignatures = sign,ai_new_label=ai_new_label)
 
+def _log_ai_feedback(unique_survey, chosen_sig, chosen_label):
+    """
+    unique_survey: Survey document
+    chosen_sig: Signature document or None
+    chosen_label: string label (ifThen)
+    """
+    suggestion = session.pop("ai_suggestion", None)  # pop so it doesn't leak into other surveys
+    if not suggestion:
+        return
+
+    suggested_sig_id = suggestion.get("best_sig_id")
+    suggested_label = (
+    suggestion.get("best_label")
+    or suggestion.get("ai_new_label")
+    or ""
+    ).strip()
+
+    model_version = suggestion.get("model_version")
+
+    chosen_sig_id = str(chosen_sig.id) if chosen_sig else None
+    chosen_label_norm = (chosen_label or "").strip()
+
+    # Decide whether user accepted the AI suggestion:
+    # - If AI recommended an existing signature: accept when chosen_sig_id matches
+    # - Otherwise accept when chosen_label matches the AI’s proposed label (case-insensitive)
+    was_accepted = False
+    if suggested_sig_id and chosen_sig_id:
+        was_accepted = (chosen_sig_id == suggested_sig_id)
+    elif suggested_label and chosen_label_norm:
+        was_accepted = (chosen_label_norm.lower() == suggested_label.lower())
+
+    AICategoryFeedback(
+        user=current_user,
+        survey=unique_survey,
+        suggested_sig_id=suggested_sig_id,
+        suggested_label=suggested_label,
+        chosen_sig_id=chosen_sig_id,
+        chosen_label=chosen_label_norm,
+        was_accepted=was_accepted,
+        model_version=model_version
+    ).save()
 
 def intersection(survey, currentSurvey):
     result = []
