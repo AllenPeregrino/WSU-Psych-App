@@ -8,8 +8,8 @@ from config import Config
 from flask_login import  current_user, login_required
 from app import db
 from app.Model.models import User, Survey, SituationList, Signature, Thoughtspositive, Thoughtsnegative, \
-    Feelingspositive, Feelingsnegative, Behaviormc, AICategoryFeedback
-from app.Controller.forms import SituationForm, WhatHappened, Thoughts, Feelings, Behavior, SortingForm2, AdminQsortForm,TherapyForm,SortingForm
+    Feelingspositive, Feelingsnegative, Behaviormc, AICategoryFeedback, PersonalityComponent
+from app.Controller.forms import SituationForm, WhatHappened, Thoughts, Feelings, Behavior, SortingForm2, AdminQsortForm, TherapyForm, SortingForm, PersonalityComponentsSetupForm
 from datetime import datetime
 from sqlalchemy.sql import func
 from sqlalchemy import desc
@@ -105,6 +105,48 @@ def search():
 @login_required
 def pica():
     return render_template('PICA.html', title="PsychClinic Web")
+
+@bp_routes.route('/personality_components', methods=['GET', 'POST'])
+@login_required
+def personality_components():
+    form = PersonalityComponentsSetupForm()
+
+    existing = PersonalityComponent.objects(user=current_user)
+
+    if request.method == 'GET':
+        existing_list = list(existing)
+        fields = [
+            form.comp1, form.comp2, form.comp3, form.comp4, form.comp5,
+            form.comp6, form.comp7, form.comp8, form.comp9, form.comp10
+        ]
+        for i, comp in enumerate(existing_list[:10]):
+            fields[i].data = comp.name
+
+    if form.validate_on_submit():
+        entries = [
+            form.comp1.data, form.comp2.data, form.comp3.data, form.comp4.data, form.comp5.data,
+            form.comp6.data, form.comp7.data, form.comp8.data, form.comp9.data, form.comp10.data
+        ]
+
+        cleaned = []
+        seen = set()
+        for entry in entries:
+            if entry and entry.strip():
+                name = entry.strip()
+                key = name.lower()
+                if key not in seen:
+                    cleaned.append(name)
+                    seen.add(key)
+
+        PersonalityComponent.objects(user=current_user).delete()
+
+        for name in cleaned[:10]:
+            PersonalityComponent(user=current_user, name=name).save()
+
+        flash("Personality components saved.")
+        return redirect(url_for('routes.personality_components'))
+
+    return render_template('personality_components.html', form=form)
 
 @bp_routes.route('/qsort', methods=['GET', 'POST'])
 @login_required
@@ -364,14 +406,34 @@ def behavior(survey_id, pos_neg, back=0):
                     behaviors_description=behaviorForm.descriptionPositive.data
                 )
 
-        # AI-based categorization (positive situations only)
+        # AI-based categorization
         similarSurvey = "-1"
         allSimilarSurveyID = []
         convertSTR = "-1"
 
-        if pos_neg == "True" and unique_survey:
-            user_sigs = Signature.objects(user=current_user)
-            prior_surveys = Survey.objects(user=current_user)
+        if unique_survey:
+            current_valence = unique_survey.situation
+
+            same_valence_surveys = Survey.objects(
+                user=current_user,
+                situation=current_valence,
+                signature__ne=None
+            )
+
+            same_valence_signature_ids = []
+            for s in same_valence_surveys:
+                if s.signature and s.signature.id not in same_valence_signature_ids:
+                    same_valence_signature_ids.append(s.signature.id)
+
+            user_sigs = Signature.objects(
+                id__in=same_valence_signature_ids,
+                user=current_user
+            )
+
+            prior_surveys = Survey.objects(
+                user=current_user,
+                situation=current_valence
+            )
 
 
             try:
@@ -407,7 +469,11 @@ def behavior(survey_id, pos_neg, back=0):
                 best_sig = Signature.objects(id=best_sig_id, user=current_user).first()
                 if best_sig:
                     best_survey = (
-                        Survey.objects(user=current_user, signature=best_sig)
+                        Survey.objects(
+                            user=current_user,
+                            signature=best_sig,
+                            situation=current_valence
+                        )
                         .order_by('-timestamp')
                         .first()
                     )
@@ -422,37 +488,30 @@ def behavior(survey_id, pos_neg, back=0):
                 if not sig:
                     continue
                 s = (
-                    Survey.objects(user=current_user, signature=sig)
+                    Survey.objects(
+                        user=current_user,
+                        signature=sig,
+                        situation=current_valence
+                    )
                     .order_by('-timestamp')
                     .first()
                 )
                 if s:
                     allSimilarSurveyID.append(s.id)
 
-                if s:
-                    allSimilarSurveyID.append(s.id)
-
             convertSTR = convertList(allSimilarSurveyID)
 
         # ---------- Redirect ----------
-        if pos_neg == "True":
-            # Positive situations go to Sorting (with possible AI suggestions)
-            return redirect(url_for(
-                'routes.sorting',
-                survey_id=unique_survey.id,
-                pos_neg=pos_neg,
-                back='0',
-                similarSurvey=similarSurvey,
-                allSimilarList=convertSTR
-            ))
-        else:
-            # Negative situations still go to therapy page as before
-            return redirect(url_for(
-                'routes.therapy',
-                survey_id=unique_survey.id,
-                pos_neg=pos_neg,
-                back='0'
-            ))
+        # Save AI/category routing info so we can restore it after personality page
+        session["personality_similarSurvey"] = similarSurvey
+        session["personality_allSimilarList"] = convertSTR
+
+        return redirect(url_for(
+            'routes.personality_relevance',
+            survey_id=unique_survey.id,
+            pos_neg=pos_neg,
+            back='0'
+        ))
 
     # Prefill behavior description on GET
     if unique_survey:
@@ -498,7 +557,17 @@ def therapy(survey_id, pos_neg, back):
     if form.validate_on_submit():
         if unique_survey:
             unique_survey.save_therapy_page(initial_desire=form.revised_outcome.data, alt_thoughts=form.alternative_thoughts.data, alt_behaviors=form.alternative_behaviors.data)
-        return redirect(url_for('routes.sorting', survey_id=unique_survey.id, pos_neg=pos_neg, back='0', similarSurvey='-1', allSimilarList='-1'))
+        similarSurvey = session.pop("personality_similarSurvey", "-1")
+        allSimilarList = session.pop("personality_allSimilarList", "-1")
+
+        return redirect(url_for(
+            'routes.sorting',
+            survey_id=unique_survey.id,
+            pos_neg=pos_neg,
+            back='0',
+            similarSurvey=similarSurvey,
+            allSimilarList=allSimilarList
+        ))
 
 
     return render_template('therapyPage.html',
@@ -515,6 +584,76 @@ def therapy(survey_id, pos_neg, back):
                          revised_outcome=unique_survey.therapy_initial_desire,
                          alternative_thoughts=unique_survey.therapy_alternative_thoughts,
                          alternative_behaviors=unique_survey.therapy_alternative_behaviors)
+
+@bp_routes.route('/personality_relevance/<survey_id>/<pos_neg>/<back>', methods=['GET', 'POST'])
+@login_required
+def personality_relevance(survey_id, pos_neg, back):
+    unique_survey = Survey.objects(id=survey_id, user=current_user).first()
+    if not unique_survey:
+        abort(404)
+
+    components = PersonalityComponent.objects(user=current_user)
+
+    # If the user has no saved personality components, skip this page
+    if components.count() == 0:
+        if pos_neg == "True":
+            similarSurvey = session.pop("personality_similarSurvey", "-1")
+            allSimilarList = session.pop("personality_allSimilarList", "-1")
+
+            return redirect(url_for(
+                'routes.sorting',
+                survey_id=survey_id,
+                pos_neg=pos_neg,
+                back='0',
+                similarSurvey=similarSurvey,
+                allSimilarList=allSimilarList
+            ))
+        else:
+            return redirect(url_for(
+                'routes.therapy',
+                survey_id=survey_id,
+                pos_neg=pos_neg,
+                back='0'
+            ))
+
+    if request.method == 'POST':
+        selected_ids = request.form.getlist('personality_ids')
+        selected_components = PersonalityComponent.objects(
+            id__in=selected_ids,
+            user=current_user
+        )
+
+        unique_survey.personality_components = list(selected_components)
+        unique_survey.save()
+
+        if pos_neg == "True":
+            similarSurvey = session.pop("personality_similarSurvey", "-1")
+            allSimilarList = session.pop("personality_allSimilarList", "-1")
+
+            return redirect(url_for(
+                'routes.sorting',
+                survey_id=survey_id,
+                pos_neg=pos_neg,
+                back='0',
+                similarSurvey=similarSurvey,
+                allSimilarList=allSimilarList
+            ))
+        else:
+            return redirect(url_for(
+                'routes.therapy',
+                survey_id=survey_id,
+                pos_neg=pos_neg,
+                back='0'
+            ))
+
+    return render_template(
+        'personality_relevance.html',
+        survey_id=survey_id,
+        pos_neg=pos_neg,
+        back=back,
+        components=components,
+        selected_ids=[str(c.id) for c in (unique_survey.personality_components or [])]
+    )
 
 @bp_routes.route('/sorting/<survey_id>/<pos_neg>/<back>/<similarSurvey>/<allSimilarList>', methods=['GET', 'POST'])
 @login_required

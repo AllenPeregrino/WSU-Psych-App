@@ -72,6 +72,7 @@ class Survey(Document):
     signature = ReferenceField('Signature')
     user = ReferenceField('User')
     timestamp = DateTimeField(default=datetime.utcnow)
+    personality_components = ListField(ReferenceField('PersonalityComponent'))
 
     thoughts_pos = ListField(StringField(max_length=50))
     thoughts_neg = ListField(StringField(max_length=50))
@@ -149,6 +150,11 @@ class Signature(Document):
     user = ReferenceField('User')
     survey = ReferenceField('Survey', reverse_delete_rule=mongoengine.NULLIFY)
     situationList = ListField(ReferenceField('SituationList', reverse_delete_rule=mongoengine.CASCADE))
+
+class PersonalityComponent(Document):
+    user = ReferenceField('User', required=True)
+    name = StringField(required=True, max_length=100)
+    created_at = DateTimeField(default=datetime.utcnow)
 
 class AICategoryFeedback(Document):
     user = ReferenceField('User', required=True)

@@ -29,7 +29,21 @@ def _survey_summary(s):
     parts.append("Thoughts (neg): " + ", ".join(_flatten_list(getattr(s, "thoughts_neg", []))))
     parts.append("Feelings (pos): " + ", ".join(_flatten_list(getattr(s, "feelings_pos", []))))
     parts.append("Feelings (neg): " + ", ".join(_flatten_list(getattr(s, "feelings_neg", []))))
-    parts.append("Behaviors: " + ", ".join(_flatten_list(getattr(s, "behaviors_mc", []))))
+    parts.append("Behavior choices: " + ", ".join(_flatten_list(getattr(s, "behaviors_mc", []))))
+    parts.append(f"Behavior description: {getattr(s, 'behaviors_description', '')}")
+    parts.append(f"Behavior goals/outcome: {getattr(s, 'behaviors_outcome', '')}")
+
+    # Add selected personality components if present
+    try:
+        comps = getattr(s, "personality_components", []) or []
+        comp_names = []
+        for comp in comps:
+            if hasattr(comp, "name") and comp.name:
+                comp_names.append(comp.name)
+        if comp_names:
+            parts.append("Relevant personality components: " + ", ".join(comp_names))
+    except Exception:
+        pass
 
     return "\n".join(parts)
 
@@ -123,12 +137,55 @@ def suggest_category_and_matches(current_survey, user_signatures, prior_surveys_
         feedback_str = "(no feedback yet)"
 
 
-    system_msg = (
-    "You help categorize therapy diary entries into short situation category names. "
-    "Category names should be concise topic-style phrases (noun phrases). "
-    "Even if existing categories use 'If…then…', DO NOT generate new categories in that format. "
-    "Return ONLY JSON, no extra text."
-    )
+    system_msg = """
+    You help categorize therapy diary entries into short situation category names.
+
+    Categories should reflect recurring psychological/interpersonal patterns based on:
+    - core appraisal or meaning of the event
+    - dominant feelings
+    - behavioral tendencies or goals
+
+    Create category names that are:
+    - concise topic-style phrases
+    - psychologically meaningful
+    - similar in style to examples like:
+        - Fear of disappointing others
+        - Feeling excluded by others
+        - Pressure to perform well
+        - Repairing a damaged relationship
+        - Relief after uncertainty
+        - Feeling valued and connected
+        - Curiosity and exploration
+
+    Do not force entries into a rigid predefined taxonomy.
+    Instead, infer the best-fitting recurring pattern and name it at a similar level of abstraction.
+
+    Example:
+
+    Situation summary:
+    A friend canceled plans and I felt like they didn’t want to spend time with me.
+    Feelings: sad, worried
+    Behavior: withdrew from texting
+
+    Good category label:
+    Feeling excluded by others
+
+    Situation summary:
+    My supervisor pointed out mistakes in my work.
+    Feelings: embarrassed, anxious
+    Behavior: apologized repeatedly
+
+    Good category label:
+    Fear of looking incompetent
+
+    Avoid:
+    - full sentences
+    - "If ... then ..." phrasing
+    - labels that are too vague like "bad situation"
+    - labels that are too specific to only one event
+    - overly clinical jargon
+    Return ONLY JSON, no extra text.
+    """
 
     user_msg = (
         "Here is a summary of the user's situation:\n\n"
@@ -147,6 +204,11 @@ def suggest_category_and_matches(current_survey, user_signatures, prior_surveys_
         "- new_label should describe what the situation is about (theme/topic), not a full sentence.\n"
         "- Good examples: 'Possible rejection by others', 'Repairing a damaged relationship', 'Pressure to perform well'.\n"
         "- Bad examples: 'If someone criticizes me then I feel hurt', 'When X then Y'.\n\n"
+        "- Treat listed personality components as important context for identifying recurring themes.\n"
+        "- Prefer category names that resemble recurring themes or patterns, not exact event descriptions.\n"
+        "- Focus on the underlying recurring pattern, not the specific event details.\n"
+        "- The label should be similar in style to examples like 'Fear of disappointing others' or 'Feeling excluded by others'.\n"
+        "- Do not force the output to exactly match any predefined example if a better natural label fits.\n"
         "Return ONLY a JSON object with this exact shape:\n"
         "{\n"
         '  "best_label": string or null,\n'

@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+    <h1 style="padding-inline-start: 15px;">Personality Components</h1>
+
+    <div style="padding-inline-start: 20px;">
+        <p>
+            Please check any of the following personality components/characteristics
+            that you think might have influenced how you reacted in this situation.
+        </p>
+
+        <form action="" method="post">
+            {% for comp in components %}
+                <div style="margin-bottom: 8px;">
+                    <input
+                        type="checkbox"
+                        name="personality_ids"
+                        value="{{ comp.id }}"
+                        {% if comp.id|string in selected_ids %}checked{% endif %}
+                    >
+                    {{ comp.name }}
+                </div>
+            {% endfor %}
+
+            <br>
+            <input type="submit" value="Continue" class="button">
+        </form>
+
+        <form action="{{ url_for('routes.behavior', survey_id=survey_id, pos_neg=pos_neg, back=1) }}" method="post">
+            <input type="submit" value="back" class="button">
+        </form>
+    </div>
+
+{% endblock %}

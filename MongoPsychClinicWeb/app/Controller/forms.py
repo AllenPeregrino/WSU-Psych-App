@@ -171,3 +171,15 @@ class TherapyForm(FlaskForm):
     alternative_behaviors = TextAreaField('Alternative Behaviors')
     submit = SubmitField('Submit')
 
+class PersonalityComponentsSetupForm(FlaskForm):
+    comp1 = StringField("Component 1")
+    comp2 = StringField("Component 2")
+    comp3 = StringField("Component 3")
+    comp4 = StringField("Component 4")
+    comp5 = StringField("Component 5")
+    comp6 = StringField("Component 6")
+    comp7 = StringField("Component 7")
+    comp8 = StringField("Component 8")
+    comp9 = StringField("Component 9")
+    comp10 = StringField("Component 10")
+    submit = SubmitField("Save Personality Components")
