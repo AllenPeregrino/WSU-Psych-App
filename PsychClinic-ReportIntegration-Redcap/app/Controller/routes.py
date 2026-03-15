@@ -25,7 +25,10 @@ from app.report_generator.automated_responses import get_redcap_survey
 import traceback
 import pandas as pd
 
-PROCESSED_RESPONSES_FILE = "/home/WSUPsych/PsychClinic-ReportIntegration-Final/app/report_generator/processed_responses.txt"
+# --- Define base directories dynamically ---
+PROCESSED_RESPONSES_FILE = "/home/WSUPsych/PsychClinic-ReportIntegration-Redcap/app/report_generator/processed_responses.txt"
+REPORT_DIR = "/home/WSUPsych/PsychClinic-ReportIntegration-Redcap/app/report_generator"
+
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('FLASK_SECRET_KEY', 'default_fallback_key')
@@ -411,12 +414,9 @@ def generate_report():
 def load_processed_responses():
     """Load processed response IDs from file, creating the file if it doesn't exist."""
     if not os.path.exists(PROCESSED_RESPONSES_FILE):
-        # Create an empty file to avoid errors
         with open(PROCESSED_RESPONSES_FILE, "w") as f:
-            pass  # Just creates the file, doesn't write anything
+            pass
         return set()
-
-    # Read the file if it exists
     with open(PROCESSED_RESPONSES_FILE, "r") as f:
         return set(line.strip() for line in f.readlines())
 
@@ -428,74 +428,68 @@ def save_processed_response(response_id):
 @bp_routes.route('/redcap_webhook', methods=['POST'])
 def redcap_webhook():
     try:
-        # Log incoming request data
-        print("Incoming REDCap webhook request data:", request.get_data())
-        print("Request headers:", request.headers)
+        print("Incoming REDCap webhook request:")
+        print("Form data:", request.form.to_dict())
+        print("Query args:", request.args.to_dict())
+        instrument = request.form.get('instrument')
+        complete = None
+        print("instrument:",instrument)
 
-        # Check for the token in the request headers
+
+        # --- Security: verify token ---
         token = request.args.get('token')
         if token != 'mysecrettoken123':
             return jsonify({"status": "Unauthorized"}), 401
 
-        # Process the webhook data
-        record_id = request.args.get('record')
+        record_id = request.form.get('record')
+        if instrument:
+            complete = request.form.get(f"{instrument}_complete")
+            print("complete",complete)
+
         if not record_id:
             return jsonify({"status": "Bad Request", "error": "Missing record_id"}), 400
 
-        print(f"Triggered for REDCap record_id: {record_id}")
 
 
-        # Load previously processed responses
+        print(f"Processing REDCap record_id: {record_id}")
+
         processed_responses = load_processed_responses()
-
-        print(f"Already Processed Response IDs: {processed_responses}")
-
-        print(f"RecordID {record_id} will be checked")
-        # Check if this response has already been processed
         if record_id in processed_responses:
-            print(f"RecordID {record_id} has already been processed. Skipping.")
-            return jsonify({"status": "Already Processed", "RecordID": record_id}), 200
+            print(f"RecordID {record_id} already processed. Skipping.")
+            return jsonify({"status": "Already Processed", "record_id": record_id}), 200
 
-        # Define the path where you want to save the survey CSV file
-        save_survey_path = "/home/WSUPsych/PsychClinic-ReportIntegration-Redcap/app/report_generator"
+       # --- Save CSV dynamically ---
+        os.makedirs(REPORT_DIR, exist_ok=True)
+        record_csv_path = os.path.join(REPORT_DIR, f"record_{record_id}.csv")
+        get_redcap_survey(save_path=REPORT_DIR, record_id=int(record_id))  # Make sure this returns CSV
+        if not os.path.exists(record_csv_path):
+            raise FileNotFoundError(f"CSV file not found at {record_csv_path}")
 
-        try:
-            # Fetch the full REDCap CSV
-            csv_survey_path = get_redcap_survey(save_path=save_survey_path)
-            print(f"Full REDCap CSV saved at: {csv_survey_path}")
+        record_df = pd.read_csv(record_csv_path)
+        if record_df.empty:
+            return jsonify({"status": "No Data Found", "record_id": record_id}), 404
 
+        create_report(record_csv_path)
+        save_processed_response(record_id)
+        print(f"Record {record_id} processed successfully.")
 
-            # Load CSV and filter to the specific record_id
-            df = pd.read_csv(csv_survey_path)
-            record_df = df[df['record_id'] == int(record_id)]
-
-            if record_df.empty:
-                print(f"No data found for record_id {record_id}")
-                return jsonify({"status": "No Data Found", "record_id": record_id}), 404
-            
-            record_csv_path = os.path.join(save_survey_path, f"record_{record_id}.csv")
-            record_df.to_csv(record_csv_path, index=False)
-            print(f"Filtered record CSV saved at: {record_csv_path}")
-
-
-            # Proceed with report generation using the downloaded CSV
-            create_report(record_csv_path)
-
-            # Save the response ID **only if everything above is successful**
-            save_processed_response(record_id)
-
-            return jsonify({"status": "Webhook processed successfully", "record_id": record_id}), 200
-        
-        except Exception as e:
-            print(f"Error processing ResponseID {record_id}: {str(e)}")
-            traceback.print_exc()
-            return jsonify({"status": "Error processing webhook", "error": str(e)}), 500
+        return jsonify({"status": "Webhook processed successfully", "record_id": record_id}), 200
 
     except Exception as e:
-        # Print the full traceback for debugging
-        print(f"Critical error occurred: {str(e)}")
+        print(f"Error processing record {record_id}: {str(e)}")
         traceback.print_exc()
-        return jsonify({"status": "Critical error processing webhook", "error": str(e)}), 500
+        return jsonify({"status": "Error processing webhook", "error": str(e)}), 500
+
+    finally:
+        # --- Delete CSV after processing ---
+        if record_csv_path and os.path.exists(record_csv_path):
+            try:
+                os.remove(record_csv_path)
+                print(f"Deleted temporary CSV: {record_csv_path}")
+            except Exception as del_err:
+                print(f"Failed to delete CSV {record_csv_path}: {del_err}")
+
 
 if __name__ == '__main__':
+    app.register_blueprint(bp_routes)
     app.run(debug=True)
