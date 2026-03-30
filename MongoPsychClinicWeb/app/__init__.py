@@ -1,3 +1,5 @@
+from dotenv import load_dotenv
+load_dotenv()
 from flask import Flask, session
 from flask_mongoengine import MongoEngine
 
@@ -5,6 +7,8 @@ from config import Config
 from flask_login import LoginManager
 from flask_moment import Moment
 from pymongo import MongoClient
+
+
 
 #cluster = "mongodb+srv://jillianplahn:a7cT5drBKQR3WagR@cluster0.qmfy4wl.mongodb.net/?retryWrites=true&w=majority"
 #client = MongoClient(cluster)

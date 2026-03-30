@@ -13,6 +13,17 @@
             <form action="" method="post">
                 {{ form.hidden_tag() }}
 
+                {% if ai_new_label or id %}
+                    <div style="padding:12px; border:1px solid #ddd; margin-bottom:15px; background:#f4f7ff; border-radius:6px;">
+                        <strong>AI Suggestion:</strong>
+                        {% if id %}
+                            {{ id }}
+                        {% elif ai_new_label %}
+                            "{{ ai_new_label }}"
+                        {% endif %}
+                    </div>
+                {% endif %}
+
                 {%if similarSurvey == "-1" %}
                 {%if pos_neg == "True" %}
 
@@ -74,13 +85,12 @@
                     {% endfor %}
                 </ul>
 
-                {{form.newCategory.label}}<br>
-                {{form.newCategory}}
-                <br>
+                {{form2.newCategory.label}}<br>
+                {{form2.newCategory(class="formbody", style="width:250px; height:50px", spellcheck="true")}}
+                <br><br>
 
-                <br>
 
-                {{ form.submit(class="button") }}
+                {{ form2.submit(class="button") }}
                 {%endif%}
              </form>
 
