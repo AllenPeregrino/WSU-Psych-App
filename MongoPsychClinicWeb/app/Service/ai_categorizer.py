@@ -187,6 +187,54 @@ def suggest_category_and_matches(current_survey, user_signatures, prior_surveys_
     Return ONLY JSON, no extra text.
     """
 
+    example_block = """
+    Here are examples of good categorization decisions.
+
+    Each Line is formatted as: 
+    Valence,WhatHappened,ThoughtsText,ThoughtsChecked,FeelingsChecked,BehaviorText,GoalsChecked,Category
+
+    Negative,"A friend canceled dinner plans at the last minute.","They probably didn’t really want to spend time with me.","They don't like me. I am not wanted. I have been rejected.|I have been disappointed. I’ve done something wrong.","Unhappy, sad, depressed|Disappointed by others, let down","I stopped texting and decided not to reschedule.","To get away from something that I didn’t like","Rejection"
+
+    Negative,"I was excluded from a social event.","I must not matter very much to them.","They don't like me. I am not wanted. I have been rejected.|I’ve lost something important to me.","Unhappy, sad, depressed|Disappointed by others, let down","I stayed home and avoided reaching out to anyone.","To get away from something that I didn’t like","Rejection"
+
+    Negative,"My supervisor pointed out several errors in a report I submitted.","I should have caught those mistakes and I probably looked incompetent.","They are right to be judgmental/critical of my minor actions/behaviors. They see that I have done something really wrong.|I look inadequate. I am being awkward. I look foolish to others.","Shame, humiliated|Disappointed in myself, regretful|Nervous, anxious, tense","I apologized repeatedly and avoided eye contact during the meeting.","To meet someone else's expectations, not make them angry or disappoint them|To make up for harm I've caused","Shame"
+
+    Negative,"My partner criticized how I handled a family issue.","Maybe I really do mess things up more than I realize.","They are right to be judgmental/critical of my minor actions/behaviors. They see that I have done something really wrong.|I look inadequate. I am being awkward. I look foolish to others.","Shame, humiliated|Disappointed in myself, regretful","I withdrew and stopped talking for the rest of the evening.","To get away from something that I didn’t like","Shame"
+
+    Negative,"A coworker interrupted me repeatedly during a meeting.","They don’t respect me and what I have to say.","This was unfair. Someone else is to blame for this bad situation.|They don't like me. I am not wanted.","Mad, angry, pissed off|Annoyed, resentful, irritated","I became curt and stopped contributing to the discussion.","To correct something that someone else did that was unfair, not right","Anger"
+
+    Negative,"I argued with my sibling over a family issue.","We will never see eye to eye on anything.","This will never get any better.|This was unfair. Someone else is to blame for this bad situation.","Mad, angry, pissed off|Frustrated, exasperated","I stopped responding to messages and disengaged.","To correct something that someone else did that was unfair, not right","Anger"
+
+    Negative,"I received a lower grade than I expected on an exam.","I was hoping for better and this shows I’m not doing well enough.","I was hoping for better. That was not what I wanted.|I don’t see how this bad situation will ever improve.","Unhappy, sad, depressed|Resigned, defeated","I avoided reviewing the feedback and procrastinated studying.","To get away from something that I didn’t like","Hopelessness"
+
+    Negative,"I skipped my planned workout.","I have no discipline and this will never improve.","This will never get any better.|I don’t see how this bad situation will ever improve.","Disappointed in myself, regretful|Resigned, defeated","I stayed on the couch scrolling on my phone.","To get away from something that I didn’t like","Hopelessness"
+
+    Negative,"I got stuck in traffic and arrived late to a meeting.","This always happens to me and I can’t get anything right.","This will never get any better.|I don’t see how to handle what is happening or about to happen. I might not be able to deal with it. Something bad might happen.","Frustrated, exasperated|Nervous, anxious, tense","I rushed in flustered and barely spoke during the meeting.","To meet someone else's expectations, not make them angry or disappoint them","Anxiety"
+
+    Negative,"My internet went down during an online presentation.","This is a disaster and I won’t recover from it.","I don’t see how to handle what is happening or about to happen. I might not be able to deal with it. Something bad might happen.","Nervous, anxious, tense|Frustrated, exasperated","I apologized repeatedly and ended the presentation early.","To get support, help/assistance from others","Anxiety"
+
+    Negative,"A colleague received recognition that I wanted.","I should have been acknowledged instead.","I was hoping for better. That was not what I wanted.|This was unfair. Someone else is to blame for this bad situation.","Annoyed, resentful, irritated|Disappointed by others, let down","I congratulated them briefly but avoided further conversation.","To correct something that someone else did that was unfair, not right","Performance"
+
+    Negative,"A coworker received recognition I hoped for.","I should have been acknowledged instead.","I was hoping for better. That was not what I wanted.|This was unfair. Someone else is to blame for this bad situation.","Annoyed, resentful, irritated|Disappointed by others, let down","I congratulated them but avoided further interaction.","To correct something that someone else did that was unfair, not right","Performance"
+
+    Positive,"I completed a challenging task successfully.","I handled that well and deserve credit.","I had a role in things turning out well.|I got what I wanted. This is good. This is great.","Pleased, proud, triumphant|Relieved","I shared the success with colleagues.","To accomplish something|To connect, feel closer to someone","Mastery"
+
+    Positive,"I solved a complex problem.","I figured it out through effort.","With some effort, I can make things better in this situation.|I deserve some credit for what I’ve done.","Eager, determined|Pleased, proud, triumphant","I documented what I learned.","To understand, learn, figure something out|To accomplish something","Mastery"
+
+    Positive,"A friend expressed appreciation for my help.","My support really mattered.","My support is needed. I can be helpful here.|I am accepted. They appreciate me for who I am.","Appreciative, thankful, grateful|Affection, close, love","I thanked them warmly.","To connect, feel closer to someone","Connection"
+
+    Positive,"I reconnected with an old friend.","This connection still matters.","This situation is meaningful to me.|I am accepted. They appreciate me for who I am.","Affection, close, love|Lighthearted, happy, joyful","I scheduled another meeting.","To connect, feel closer to someone","Connection"
+
+    Positive,"My child achieved something important.","They are growing and doing well.","Things are going to be fine.|I had a role in things turning out well.","Pleased, proud, triumphant|Hopeful, optimistic","I celebrated with them.","To connect, feel closer to someone","Relief"
+
+    Positive,"I had a relaxing evening.","This is exactly what I needed.","I got what I wanted. This is good.|I was enjoying it.","Calm, tranquil, serene|Pleasurable, enjoyment, fun","I avoided checking work email.","To be in the moment, be appreciative","Relief"
+
+    Positive,"I enjoyed a peaceful walk outdoors.","This moment feels meaningful and calming.","This situation is meaningful to me.|I was enjoying it. I am having a good time. This is fun.","Calm, tranquil, serene|Pleasurable, enjoyment, fun","I slowed down and stayed present.","To be in the moment, be appreciative","Curiosity"
+
+    Positive,"I had an engaging discussion.","This is interesting and meaningful.","This is interesting, engaging.|This situation is meaningful to me.","Interested, involved, intrigued|Excited, stimulated, passionate","I stayed in the conversation longer.","To further explore, make sense of, or try to understand something better","Curiosity"
+    
+"""
+
     user_msg = (
         "Here is a summary of the user's situation:\n\n"
         f"{_survey_summary(current_survey)}\n\n"
@@ -195,6 +243,8 @@ def suggest_category_and_matches(current_survey, user_signatures, prior_surveys_
         "Feedback memory (use this to bias your choice toward labels the user accepts):\n"
         f"{feedback_str}\n\n"
         "Decide on a category for this situation.\n\n"
+        "Here are labeled examples of good category assignments:\n"
+        f"{example_block}\n\n"
         "Rules:\n"
         "- If one of the existing labels fits well, use it as best_label.\n"
         "- You may include up to 2 other_labels that also somewhat fit.\n"
