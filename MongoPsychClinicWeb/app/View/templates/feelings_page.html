@@ -18,7 +18,22 @@
             <div class="textBox">
                 <p class="promptText">Think about the different situations/events you experienced today and select one in which you experienced positive or negative feelings.<br>For the situation you selected, did you experience mostly positive or negative feelings?</p>
                 
-                {{form.choice}}
+                <div style="margin-bottom: 6px;">
+                    <label>
+                        <input type="radio" name="choice" value="True"
+                            {% if form.choice.data == 'True' %}checked{% endif %}>
+                        Mostly positive feelings
+                    </label>
+                </div>
+
+                <div style="margin-bottom: 12px;">
+                    <label>
+                        <input type="radio" name="choice" value="False"
+                            {% if form.choice.data == 'False' %}checked{% endif %}>
+                        Mostly negative feelings
+                    </label>
+                </div>
+
                 {{ form.submit(class="button") }}
             </div>
         </form>
