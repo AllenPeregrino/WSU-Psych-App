@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block content %}
-    <h1 style="padding-inline-start: 15px;">Situation Analysis Therapy</h1>
+    <h1 style="padding-inline-start: 15px;">Situation Analysis</h1>
 
     {% if form %}
         <div style="padding-inline-start: 20px;">
@@ -33,7 +33,7 @@
 
             <div class="summary-section">
                 <strong>Behaviors:</strong>
-                <p>{{ desired_outcome }}</p>
+                <p>{{ behavior_description }}</p>
             </div>
 
             <div class="summary-section">
@@ -42,7 +42,8 @@
                     {% for behavior in selected_checked_behaviors %}
                         <li>{{ behavior }}</li>
                     {% endfor %}
-                </ul>            </div>
+                </ul>
+            </div>
 
             <form action="{{url_for('routes.therapy', survey_id=survey_id, pos_neg=pos_neg, back=0)}}" method="post">
                 {{ form.hidden_tag() }}

@@ -27,7 +27,7 @@
                 {%if similarSurvey == "-1" %}
                 {%if pos_neg == "True" %}
 
-               <b> There don't appear to be any situations that you have entered so far that have similar pattern of thinking, feeling, and behaving. Below are all your positive categories. Please choose one of the options below if you want to use one of these categories for your journal entry. If not, create a new Situation Category: </b><br>
+               <b> There don't appear to be any situations that you have entered so far that have a similar pattern of thinking, feeling, and behaving. Below are all your positive categories. Please choose one of the options below if you want to use one of these categories for your journal entry. If not, create a new Situation Category: </b><br>
             {%else%}
                <b> Below are all your negative categories. Please choose one of the options below if you want to use one of these categories for your journal entry. If not. create a new Situation Category:</b> <br>
             {%endif%}
@@ -59,8 +59,19 @@
 
             </ul>
 
-                {{form.choice.label}}
-                {{form.choice}}
+                {{ form.choice.label }}<br>
+
+                <div>
+                    <label>
+                        <input type="radio" name="choice" value="True"> True
+                    </label>
+                </div>
+
+                <div>
+                    <label>
+                        <input type="radio" name="choice" value="False"> False
+                    </label>
+                </div>
 
                <b> If false, please place this situation into one of the other similar categories below or create a new situation category for it or choose a category from the list of all categories. If you choose one of the existing situations below please write N/A in the new category text box.</b> <br>
                 <br>
